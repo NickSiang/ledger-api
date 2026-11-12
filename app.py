@@ -32,7 +32,7 @@ def create_app() -> Flask:
 
     db.init_app(app)
 
-    @app.route("/api/health", methods=["GET"])
+    @app.route("/", methods=["GET"])
     def health_check():
         return (
             jsonify(
