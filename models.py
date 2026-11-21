@@ -49,6 +49,18 @@ class Account(db.Model):
         back_populates="to_account",
         passive_deletes=True,
     )
+    incomes = db.relationship(
+        "Income",
+        foreign_keys="Income.account_id",
+        back_populates="account",
+        passive_deletes=True,
+    )
+    expenses = db.relationship(
+        "Expense",
+        foreign_keys="Expense.account_id",
+        back_populates="account",
+        passive_deletes=True,
+    )
 
     __table_args__ = (
         UniqueConstraint("name", name="uq_accounts_name"),
@@ -138,3 +150,212 @@ class Transfer(db.Model):
             name="ck_transfers_different_accounts",
         ),
     )
+
+
+class IncomeCategory(db.Model):
+    __tablename__ = "income_categories"
+
+    id = db.Column(db.BigInteger, primary_key=True, autoincrement=True)
+    name = db.Column(db.String(50), nullable=False)
+    description = db.Column(db.Text, nullable=True)
+    created_at = db.Column(
+        db.DateTime(timezone=True),
+        nullable=False,
+        server_default=func.now(),
+    )
+    updated_at = db.Column(
+        db.DateTime(timezone=True),
+        nullable=False,
+        server_default=func.now(),
+        onupdate=func.now(),
+    )
+
+    incomes = db.relationship(
+        "Income",
+        foreign_keys="Income.category_id",
+        back_populates="category",
+        passive_deletes=True,
+    )
+
+    __table_args__ = (
+        UniqueConstraint("name", name="uq_income_categories_name"),
+        CheckConstraint(
+            "btrim(name) <> ''",
+            name="ck_income_categories_name_not_empty",
+        ),
+    )
+
+
+class ExpenseCategory(db.Model):
+    __tablename__ = "expense_categories"
+
+    id = db.Column(db.BigInteger, primary_key=True, autoincrement=True)
+    name = db.Column(db.String(50), nullable=False)
+    description = db.Column(db.Text, nullable=True)
+    created_at = db.Column(
+        db.DateTime(timezone=True),
+        nullable=False,
+        server_default=func.now(),
+    )
+    updated_at = db.Column(
+        db.DateTime(timezone=True),
+        nullable=False,
+        server_default=func.now(),
+        onupdate=func.now(),
+    )
+
+    expenses = db.relationship(
+        "Expense",
+        foreign_keys="Expense.category_id",
+        back_populates="category",
+        passive_deletes=True,
+    )
+
+    __table_args__ = (
+        UniqueConstraint("name", name="uq_expense_categories_name"),
+        CheckConstraint(
+            "btrim(name) <> ''",
+            name="ck_expense_categories_name_not_empty",
+        ),
+    )
+
+
+class Income(db.Model):
+    __tablename__ = "incomes"
+
+    id = db.Column(db.BigInteger, primary_key=True, autoincrement=True)
+    account_id = db.Column(
+        db.BigInteger,
+        db.ForeignKey("accounts.id", ondelete="RESTRICT"),
+        nullable=False,
+    )
+    category_id = db.Column(
+        db.BigInteger,
+        db.ForeignKey("income_categories.id", ondelete="RESTRICT"),
+        nullable=False,
+    )
+    received_on = db.Column(db.Date, nullable=False)
+    amount = db.Column(db.Numeric(18, 4), nullable=False)
+    currency = db.Column(
+        db.String(3),
+        nullable=False,
+        default="TWD",
+        server_default=text("'TWD'"),
+    )
+    fx_rate_to_twd = db.Column(
+        db.Numeric(18, 6),
+        nullable=False,
+        default=Decimal("1"),
+        server_default=text("1"),
+    )
+    description = db.Column(db.String(200), nullable=False)
+    note = db.Column(db.Text, nullable=True)
+    created_at = db.Column(
+        db.DateTime(timezone=True),
+        nullable=False,
+        server_default=func.now(),
+    )
+    updated_at = db.Column(
+        db.DateTime(timezone=True),
+        nullable=False,
+        server_default=func.now(),
+        onupdate=func.now(),
+    )
+
+    account = db.relationship(
+        "Account",
+        foreign_keys=[account_id],
+        back_populates="incomes",
+    )
+    category = db.relationship(
+        "IncomeCategory",
+        foreign_keys=[category_id],
+        back_populates="incomes",
+    )
+
+    __table_args__ = (
+        CheckConstraint("amount > 0", name="ck_incomes_amount_positive"),
+        CheckConstraint(
+            "char_length(btrim(currency)) = 3",
+            name="ck_incomes_currency_length",
+        ),
+        CheckConstraint(
+            "fx_rate_to_twd > 0",
+            name="ck_incomes_fx_rate_to_twd_positive",
+        ),
+        CheckConstraint(
+            "btrim(description) <> ''",
+            name="ck_incomes_description_not_empty",
+        ),
+    )
+
+
+class Expense(db.Model):
+    __tablename__ = "expenses"
+
+    id = db.Column(db.BigInteger, primary_key=True, autoincrement=True)
+    account_id = db.Column(
+        db.BigInteger,
+        db.ForeignKey("accounts.id", ondelete="RESTRICT"),
+        nullable=False,
+    )
+    category_id = db.Column(
+        db.BigInteger,
+        db.ForeignKey("expense_categories.id", ondelete="RESTRICT"),
+        nullable=False,
+    )
+    spent_on = db.Column(db.Date, nullable=False)
+    amount = db.Column(db.Numeric(18, 4), nullable=False)
+    currency = db.Column(
+        db.String(3),
+        nullable=False,
+        default="TWD",
+        server_default=text("'TWD'"),
+    )
+    fx_rate_to_twd = db.Column(
+        db.Numeric(18, 6),
+        nullable=False,
+        default=Decimal("1"),
+        server_default=text("1"),
+    )
+    description = db.Column(db.String(200), nullable=False)
+    note = db.Column(db.Text, nullable=True)
+    created_at = db.Column(
+        db.DateTime(timezone=True),
+        nullable=False,
+        server_default=func.now(),
+    )
+    updated_at = db.Column(
+        db.DateTime(timezone=True),
+        nullable=False,
+        server_default=func.now(),
+        onupdate=func.now(),
+    )
+
+    account = db.relationship(
+        "Account",
+        foreign_keys=[account_id],
+        back_populates="expenses",
+    )
+    category = db.relationship(
+        "ExpenseCategory",
+        foreign_keys=[category_id],
+        back_populates="expenses",
+    )
+
+    __table_args__ = (
+        CheckConstraint("amount > 0", name="ck_expenses_amount_positive"),
+        CheckConstraint(
+            "char_length(btrim(currency)) = 3",
+            name="ck_expenses_currency_length",
+        ),
+        CheckConstraint(
+            "fx_rate_to_twd > 0",
+            name="ck_expenses_fx_rate_to_twd_positive",
+        ),
+        CheckConstraint(
+            "btrim(description) <> ''",
+            name="ck_expenses_description_not_empty",
+        ),
+    )
+
