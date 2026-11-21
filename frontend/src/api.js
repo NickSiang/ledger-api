@@ -1,15 +1,43 @@
 import axios from 'axios';
 
-// 預設為本地端 Flask 伺服器網址，亦可透過 .env 中的 VITE_API_BASE_URL 覆蓋（適用於未來 GitHub Pages 串接 Vercel 後端）
-const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://127.0.0.1:5000';
+// 取得當前設定的 API Base URL（優先採用 localStorage 中使用者自訂的網址，次選環境變數，預設為本地端）
+export const getApiBaseUrl = () => {
+  const customUrl = localStorage.getItem('LEDGER_API_URL');
+  if (customUrl && customUrl.trim()) {
+    return customUrl.trim().replace(/\/+$/, '');
+  }
+  return (import.meta.env.VITE_API_BASE_URL || 'http://127.0.0.1:5000').replace(/\/+$/, '');
+};
 
 const apiClient = axios.create({
-  baseURL: API_BASE_URL,
+  baseURL: getApiBaseUrl(),
   headers: {
     'Content-Type': 'application/json',
   },
-  timeout: 10000,
+  timeout: 8000,
 });
+
+// 當每次發送請求時，動態確保 baseURL 為最新設定
+apiClient.interceptors.request.use((config) => {
+  config.baseURL = getApiBaseUrl();
+  return config;
+});
+
+// 設定自訂 API Base URL（適用於 GitHub Pages 填寫 Vercel 後端網址）
+export const setApiBaseUrl = (url) => {
+  if (url && url.trim()) {
+    localStorage.setItem('LEDGER_API_URL', url.trim().replace(/\/+$/, ''));
+  } else {
+    localStorage.removeItem('LEDGER_API_URL');
+  }
+  apiClient.defaults.baseURL = getApiBaseUrl();
+};
+
+// 檢查後端健康狀況
+export const checkHealth = async () => {
+  const response = await apiClient.get('/');
+  return response.data;
+};
 
 // 帳戶相關 API
 export const getAccounts = async () => {
@@ -26,7 +54,6 @@ export const getAccounts = async () => {
           ...balRes.data.data,
         };
       } catch (err) {
-        console.error(`獲取帳戶 ${acc.id} 餘額失敗:`, err);
         return {
           ...acc,
           balance: acc.opening_balance || 0,
@@ -36,6 +63,12 @@ export const getAccounts = async () => {
   );
 
   return accountsWithBalance;
+};
+
+// 新增帳戶並儲存至 Supabase
+export const createAccount = async (data) => {
+  const response = await apiClient.post('/api/accounts', data);
+  return response.data.data;
 };
 
 // 分類 API
